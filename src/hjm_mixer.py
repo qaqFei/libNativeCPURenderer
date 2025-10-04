@@ -2,6 +2,7 @@ import argparse
 
 import midi_parse
 import pydub
+import tqdm
 
 import libNativeCPURendererPybind as CPURenderer
 
@@ -53,7 +54,7 @@ notebin.result.sort(key=lambda x: x[0])
 FRAME_RATE = 44100
 CHANNELS = 2
 
-max_time = msgs[-1]["sec_time"] + 1.0
+max_time = notebin.result[-1][0] + 1.0
 bgm = CPURenderer.AudioClip.slient(FRAME_RATE, CHANNELS, int(FRAME_RATE * max_time))
 nums_hjm = 15
 hjm_source = CPURenderer.AudioClip.from_pydub_seg(pydub.AudioSegment.from_file("./../test_files/hjm_source.ogg"))
@@ -66,13 +67,16 @@ for i in range(nums_hjm):
 
 curri = -1
 
-std_hz = 440
-for sec, et, n in notebin.result:
+std_hz = 440 * 2 ** (4 / 12)
+for sec, et, n in tqdm.tqdm(notebin.result):
     hz = 440 * (2 ** ((n - 69) / 12))
     hz_gain = hz / std_hz
+    if hz_gain < 0.8:
+        continue
     curri = (curri + 1) % nums_hjm
     hjm = hjms[curri].clone()
     hjm.apply_speed(hz_gain)
+    hjm.resample_like(bgm)
     bgm.overlay(hjm, sec, time_unit="second")
 
 with open(args.output, "wb") as f:
