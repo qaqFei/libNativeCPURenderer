@@ -71,8 +71,6 @@ std_hz = 440 * 2 ** (4 / 12)
 for sec, et, n in tqdm.tqdm(notebin.result):
     hz = 440 * (2 ** ((n - 69) / 12))
     hz_gain = hz / std_hz
-    if hz_gain < 0.8:
-        continue
     curri = (curri + 1) % nums_hjm
     hjm = hjms[curri].clone()
     hjm.apply_speed(hz_gain)
