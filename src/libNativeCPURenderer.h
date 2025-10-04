@@ -137,4 +137,6 @@ extern "C" {
     void ApplyVolumeGain(AudioClip* clip, f64 gain);
     bool PutAudioIntoVideoCap(VideoCap* vCap, AudioClip* aClip, i64 bitRate);
     i64 GetVersion();
+    void ApplyCutAudioClip(AudioClip* clip, i64 startFrame, i64 endFrame);
+    void ApplySpeedAudioClip(AudioClip* clip, f64 speed);
 }

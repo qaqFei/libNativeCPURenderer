@@ -1162,3 +1162,23 @@ void ApplyVolumeGain(AudioClip* clip, f64 gain) {
 i64 GetVersion() {
     return LIB_NATIVE_CPU_RENDERER_VERSION;
 }
+
+void ApplyCutAudioClip(AudioClip* clip, i64 startFrame, i64 endFrame) {
+    f64* newBuffer = new f64[GetAudioClipBufferSizeFromData(endFrame - startFrame, clip->channels)];
+
+    for (i64 i = 0; i < endFrame - startFrame; ++i) {
+        if (startFrame + i >= clip->numFrames) break;
+        for (i64 c = 0; c < clip->channels; ++c) {
+            newBuffer[i * clip->channels + c] = clip->buffer[(startFrame + i) * clip->channels + c];
+        }
+    }
+
+    delete[] clip->buffer;
+    
+    clip->buffer = newBuffer;
+    clip->numFrames = endFrame - startFrame;
+}
+
+void ApplySpeedAudioClip(AudioClip* clip, f64 speed) {
+    clip->sampleRate *= speed;
+}

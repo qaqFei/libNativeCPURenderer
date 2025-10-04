@@ -417,7 +417,7 @@ class AudioClip:
 
         return PtrCreatedAudioClip(CreateSilentAudioClip(sample_rate, channels, num_frames))
     
-    def clone():
+    def clone(self):
         CloneAudioClip = lib.CloneAudioClip
         CloneAudioClip.argtypes = (ctypes.c_void_p,)
         CloneAudioClip.restype = ctypes.c_void_p
@@ -479,6 +479,30 @@ class AudioClip:
         ApplyVolumeGain.restype = None
         
         ApplyVolumeGain(self._ptr, gain)
+    
+    def cut(self, start: int|float, end: int|float, *, time_unit: typing.Literal["frame", "second"] = "frame"):
+        if time_unit not in ("frame", "second"):
+            raise ValueError("time_unit must be 'frame' or 'second'")
+        
+        if time_unit == "frame":
+            start = int(start)
+            end = int(end)
+        else:
+            start = int(start * self._sample_rate)
+            end = int(end * self._sample_rate)
+        
+        ApplyCutAudioClip = lib.ApplyCutAudioClip
+        ApplyCutAudioClip.argtypes = (ctypes.c_void_p, ctypes.c_long, ctypes.c_long)
+        ApplyCutAudioClip.restype = None
+
+        ApplyCutAudioClip(self._ptr, start, end)
+    
+    def apply_speed(self, speed: float):
+        ApplySpeedAudioClip = lib.ApplySpeedAudioClip
+        ApplySpeedAudioClip.argtypes = (ctypes.c_void_p, ctypes.c_double)
+        ApplySpeedAudioClip.restype = None
+        
+        ApplySpeedAudioClip(self._ptr, speed)
     
     def __del__(self):
         DestroyAudioClip = lib.DestroyAudioClip
