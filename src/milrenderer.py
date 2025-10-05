@@ -29,6 +29,7 @@ aparser.add_argument("-d", "--debug", action="store_true")
 aparser.add_argument("-sl", "--silent", action="store_true")
 
 args = aparser.parse_args()
+mode = 0
 
 logging.basicConfig(
     level = logging.INFO if not args.debug else logging.DEBUG,
@@ -110,8 +111,7 @@ easings: list[list[typing.Callable[[float], float]]] = [
 ]
 
 logging.info("creating render context")
-# ctx = CPURenderer.RenderContext(w, h, enable_alpha=False)
-ctx = CPURenderer.MultiThreadedRenderContextPreparer(w, h, enable_alpha=False)
+ctx = CPURenderer.MultiThreadedVideoRenderContextPreparer(w, h, enable_alpha=False) if mode == 1 else CPURenderer.RenderContext(w, h, enable_alpha=False)
 cap = CPURenderer.VideoCap(w, h, fps)
 
 def error(msg: str):
@@ -562,6 +562,151 @@ class IterRemovableList(typing.Generic[T]):
             self.tail.next = new
             self.tail = new
 
+class WebCanvas2DTransform:
+    def __init__(self, matrix: typing.Optional[typing.Tuple[float, float, float, float, float, float]] = None):
+        self.matrix = matrix if matrix is not None else (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+    
+    def resetTransform(self):
+        self.matrix = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+        return self
+
+    def setTransform(self, a: float, b: float, c: float, d: float, e: float, f: float):
+        self.matrix = (a, b, c, d, e, f)
+        return self
+
+    def transform(self, a: float, b: float, c: float, d: float, e: float, f: float):
+        self.matrix = (
+            self.matrix[0] * a + self.matrix[2] * b,
+            self.matrix[1] * a + self.matrix[3] * b,
+            self.matrix[0] * c + self.matrix[2] * d,
+            self.matrix[1] * c + self.matrix[3] * d,
+            self.matrix[0] * e + self.matrix[2] * f + self.matrix[4],
+            self.matrix[1] * e + self.matrix[3] * f + self.matrix[5]
+        )
+        return self
+    
+    def scale(self, x: float, y: float):
+        self.transform(x, 0.0, 0.0, y, 0.0, 0.0)
+        return self
+    
+    def translate(self, x: float, y: float):
+        self.transform(1.0, 0.0, 0.0, 1.0, x, y)
+        return self
+    
+    def rotate(self, angle: float):
+        self.transform(math.cos(angle), math.sin(angle), -math.sin(angle), math.cos(angle), 0.0, 0.0)
+        return self
+    
+    def rotateDegree(self, angle: float):
+        self.rotate(angle * math.pi / 180.0)
+        return self
+    
+    def getPoint(self, x: float, y: float):
+        return (
+            self.matrix[0] * x + self.matrix[2] * y + self.matrix[4],
+            self.matrix[1] * x + self.matrix[3] * y + self.matrix[5]
+        )
+    
+    def getRectPoints(self, x: float, y: float, width: float, height: float):
+        return (
+            self.getPoint(x, y),
+            self.getPoint(x + width, y),
+            self.getPoint(x + width, y + height),
+            self.getPoint(x, y + height)
+        )
+    
+    def getCRectPoints(self, x: float, y: float, width: float, height: float):
+        x -= width / 2
+        y -= height / 2
+        return self.getRectPoints(x, y, width, height)
+    
+    def getInverse(self):
+        a, b, c, d, e, f = self.matrix
+        det = a * d - b * c
+        inv_det = 1.0 / det if det != 0.0 else 1e9
+        inv = (
+            d * inv_det,
+            -b * inv_det,
+            -c * inv_det,
+            a * inv_det,
+            (c * f - d * e) * inv_det,
+            (b * e - a * f) * inv_det
+        )
+        return WebCanvas2DTransform(inv)
+
+def is_intersect(
+    line_1: tuple[
+        tuple[float, float],
+        tuple[float, float]
+    ],
+    line_2: tuple[
+        tuple[float, float],
+        tuple[float, float]
+    ]
+) -> bool:
+    return not (
+        max(line_1[0][0], line_1[1][0]) < min(line_2[0][0], line_2[1][0]) or
+        max(line_2[0][0], line_2[1][0]) < min(line_1[0][0], line_1[1][0]) or
+        max(line_1[0][1], line_1[1][1]) < min(line_2[0][1], line_2[1][1]) or
+        max(line_2[0][1], line_2[1][1]) < min(line_1[0][1], line_1[1][1])
+    )
+
+def batch_is_intersect(
+    lines_group_1: list[tuple[
+        tuple[float, float],
+        tuple[float, float]
+    ]],
+    lines_group_2: list[tuple[
+        tuple[float, float],
+        tuple[float, float]
+    ]]
+):
+    for i in lines_group_1:
+        for j in lines_group_2:
+            yield is_intersect(i, j)
+
+def getScreenPoints(w: int, h: int):
+    return [(0, 0), (w, 0), (w, h), (0, h)]
+
+def polygon2lines(p: list[tuple[float, float]]):
+    return [(p[i], p[i + 1]) for i in range(-1, len(p) - 1)]
+
+def pointInPolygon(ploygon: list[tuple[float, float]], point: tuple[float, float]):
+    n = len(ploygon)
+    j = n - 1
+    res = False
+    for i in range(n):
+        if (
+            (ploygon[i][1] > point[1]) != (ploygon[j][1] > point[1])
+            and (
+                point[0] < (
+                    (ploygon[j][0] - ploygon[i][0])
+                    * (point[1] - ploygon[i][1])
+                    / (ploygon[j][1] - ploygon[i][1])
+                    + ploygon[i][0]
+                )
+            )
+        ):
+            res = not res
+        j = i
+    return res
+
+def polygonIntersect(p1: list[tuple[float, float]], p2: list[tuple[float, float]]):
+    return (
+        any(batch_is_intersect(polygon2lines(p1), polygon2lines(p2)))
+        or any(pointInPolygon(p1, i) for i in p2)
+        or any(pointInPolygon(p2, i) for i in p1)
+    )
+
+def polygonInScreen(w: int, h: int, polygon: list[tuple[float, float]]):
+    return polygonIntersect(getScreenPoints(w, h), polygon)
+
+def getLineLength(x0: float, y0: float, x1: float, y1: float):
+    try:
+        return ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
+    except OverflowError:
+        return float("inf")
+
 class MilLine:
     def __init__(self, data: dict):
         self.animations = list(map(MilAnimation, data["animations"]))
@@ -717,7 +862,7 @@ current_hit_effects = []
 
 logging.info("rendering")
 
-for frame_i in tqdm.trange(num_frames, desc="Preparing"):
+for frame_i in tqdm.trange(num_frames, desc="Preparing" if mode == 1 else "Rendering"):
     ctx.set_color(0, 0, 0, 0)
     t = frame_i / cap.frame_rate
     chart.update(t)
@@ -779,7 +924,7 @@ for frame_i in tqdm.trange(num_frames, desc="Preparing"):
         ctx.rotate_degree(lineRot - 90)
         ctx.scale(lineSize, lineSize)
         for ngroup in line.note_groups:
-            for note, rm in ngroup:
+            for i, (note, rm) in enumerate(ngroup):
                 noteClicked = note.time <= t
 
                 if noteClicked and not note.clicked:
@@ -828,28 +973,41 @@ for frame_i in tqdm.trange(num_frames, desc="Preparing"):
                 if note.ishold:
                     noteTransp *= 1.0 - fixorp((t - note.endTime) / HOLD_DISAPPEAR_TIME)
                 
-                if noteTransp > 0.0:
-                    ctx.save_state()
-                    ctx.apply_color_transform(*map(lambda x: x / 255, note.acollection.get_value(EnumAnimationKey.Color)))
-                    ctx.apply_color_transform(1, 1, 1, noteTransp)
-                    ctx.translate(*notePos)
-                    ctx.rotate_degree(noteRot)
-                    ctx.scale(noteSize, noteSize)
+                ctx.save_state()
+                ctx.apply_color_transform(*map(lambda x: x / 255, note.acollection.get_value(EnumAnimationKey.Color)))
+                ctx.apply_color_transform(1, 1, 1, noteTransp)
+                ctx.translate(*notePos)
+                ctx.rotate_degree(noteRot)
+                ctx.scale(noteSize, noteSize)
 
-                    if not note.ishold:
-                        noteHeight = noteWidth / noteTex.width * noteTex.height
-                        ctx.draw_texture(noteTex, -noteWidth / 2,  -noteHeight / 2, noteWidth, noteHeight)
-                    else:
-                        altas = game_res["meta"]["holdAtlas" if not note.morebets else "holdDoubleAtlas"]
-                        holdHeadHeight = holdTailHeight = noteWidth / 2
-                        holdLength = max(0, (note.endFloorPosition - (lineFp if noteClicked else note.floorPosition)) * noteFpMult)
+                wtf = WebCanvas2DTransform(ctx.get_transform())
 
-                        ctx.draw_splitted_texture(noteTex, -holdHeadHeight, -noteWidth / 2, holdHeadHeight + 1, noteWidth, 0, altas[0] / noteTex.width, 0.0, 1.0)
-                        ctx.draw_splitted_texture(noteTex, 0, -noteWidth / 2, holdLength + 1, noteWidth, altas[0] / noteTex.width, 1.0 - altas[1] / noteTex.width, 0.0, 1.0)
-                        ctx.draw_splitted_texture(noteTex, holdLength, -noteWidth / 2, holdTailHeight + 1, noteWidth, 1.0 - altas[1] / noteTex.width, 1.0, 0.0, 1.0)
+                if not note.ishold:
+                    noteHeight = noteWidth / noteTex.width * noteTex.height
+                    poly = wtf.getCRectPoints(0, 0, noteHeight, noteWidth)
+                else:
+                    altas = game_res["meta"]["holdAtlas" if not note.morebets else "holdDoubleAtlas"]
+                    holdHeadHeight = holdTailHeight = noteWidth / 2
+                    holdLength = max(0, (note.endFloorPosition - (lineFp if noteClicked else note.floorPosition)) * noteFpMult)
+                    poly = wtf.getCRectPoints(holdLength / 2, 0, holdLength + holdHeadHeight + holdTailHeight, noteWidth)
                     
-                    note.transform = ctx.get_transform()
-                    ctx.restore_state()
+                if not polygonInScreen(w, h, poly):
+                    if ngroup.can_break and ((
+                        getLineLength(w / 2, h / 2, *wtf.getPoint(0, (1 if noteFpMult > 0 else -1))) - 
+                        getLineLength(w / 2, h / 2, *wtf.getPoint(0, 0)) > 0.0
+                    ) or noteFpMult == 0.0):
+                        ctx.restore_state()
+                        break
+
+                if not note.ishold:
+                    ctx.draw_texture(noteTex, -noteHeight / 2, -noteWidth / 2, noteHeight, noteWidth)
+                else:
+                    ctx.draw_splitted_texture(noteTex, -holdHeadHeight, -noteWidth / 2, holdHeadHeight + 1, noteWidth, 0, altas[0] / noteTex.width, 0.0, 1.0)
+                    ctx.draw_splitted_texture(noteTex, 0, -noteWidth / 2, holdLength + 1, noteWidth, altas[0] / noteTex.width, 1.0 - altas[1] / noteTex.width, 0.0, 1.0)
+                    ctx.draw_splitted_texture(noteTex, holdLength, -noteWidth / 2, holdTailHeight + 1, noteWidth, 1.0 - altas[1] / noteTex.width, 1.0, 0.0, 1.0)
+                
+                note.transform = ctx.get_transform()
+                ctx.restore_state()
         
         ctx.restore_state()
 
@@ -874,6 +1032,9 @@ for frame_i in tqdm.trange(num_frames, desc="Preparing"):
     for hite in removes_hit_effects:
         current_hit_effects.remove(hite)
 
-    # cap.put_renderer_context_frame(ctx)
+    if mode == 1:
+        ctx.end_of_frame()
+    else:
+        cap.put_renderer_context_frame(ctx)
 
 cap.release()

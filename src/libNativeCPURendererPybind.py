@@ -5,7 +5,6 @@ import struct
 import math
 import typing
 import random
-import queue
 
 lib = ctypes.CDLL("./libNativeCPURenderer.so")
 
@@ -300,10 +299,11 @@ class RenderContext:
         from PIL import Image
         return Image.frombytes("RGBA", (self.width, self.height), self.get_buffer_as_uint8())
 
-class MultiThreadedRenderContextPreparer(RenderContext):
-    def __init__(self, *args, **kwargs):
+class MultiThreadedVideoRenderContextPreparer(RenderContext):
+    def __init__(self, v_cap: VideoCap, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.frames = []
+        self.v_cap = v_cap
         self.end_of_frame()
 
         proxy_methods = (
@@ -347,7 +347,7 @@ class MultiThreadedRenderContextPreparer(RenderContext):
         for method_name in proxy_methods:
             def dec(name: str):
                 def wappered(*args, **kwargs):
-                    self.frames[-1].put((name, args, kwargs))
+                    self.frames[-1].append((name, args, kwargs))
 
                     if name in call_immediate_methods:
                         getattr(RenderContext, name)(self, *args, **kwargs)
@@ -357,8 +357,15 @@ class MultiThreadedRenderContextPreparer(RenderContext):
             dec(method_name)
     
     def end_of_frame(self):
-        self.frames.append(queue.Queue())
+        self.frames.append([])
+    
+    def renderer(self):
+        block_size = 60
+        ctxs = [RenderContext(self.width, self.height, self.enable_alpha) for _ in range(block_size)]
 
+        def runner():
+            pass
+    
 class Texture:
     def __init__(self, width: int, height: int, enableAlpha: bool, data: typing.ByteString, is_uint8: bool = True):
         if width * height * (3 if not enableAlpha else 4) * (1 if is_uint8 else 8) != len(data):
