@@ -23,6 +23,7 @@ aparser.add_argument("-f", "--fps", type=int, default=60)
 aparser.add_argument("-s-w", "--width", type=int, default=1920)
 aparser.add_argument("-s-h", "--height", type=int, default=1080)
 aparser.add_argument("-ns", "--note-scale", type=float, default=1.0)
+aparser.add_argument("-fs", "--flow-speed", type=float, default=1.66)
 aparser.add_argument("-d", "--debug", action="store_true")
 aparser.add_argument("-sl", "--silent", action="store_true")
 
@@ -49,8 +50,14 @@ LINE_HEAD_SIZE = 0.0223 * args.note_scale
 LINE_HEAD_BORDER = LINE_HEAD_SIZE * (18 / 186)
 NOTE_SIZE = LINE_HEAD_SIZE
 NOTE_SCALE = 335 / 185
+SPEED_UNIT = 120
 logging.debug(f"{LINE_CIRCLE_WIDTH=}, {LINE_HEAD_SIZE=}")
 logging.debug(f"{LINE_HEAD_BORDER=}, {NOTE_SIZE=}, {NOTE_SCALE=}")
+logging.debug(f"{SPEED_UNIT=}")
+
+HOLD_DISAPPEAR_TIME = 0.2
+FLOW_SPEED = args.flow_speed
+logging.debug(f"{HOLD_DISAPPEAR_TIME=}, {FLOW_SPEED=}")
 
 easings: list[list[typing.Callable[[float], float]]] = [
     [
@@ -189,6 +196,8 @@ def rotate_point(x: float, y: float, deg: float, l: float):
         y + s * l
     )
 
+fixorp = lambda x: max(0, min(x, 1))
+
 class EnumAnimationKey:
     Unknown = -1
     
@@ -261,6 +270,7 @@ class MilNote:
         self.master: typing.Optional[MilLine] = None
         self.floorPosition = 0.0
         self.endFloorPosition = 0.0
+        self.morebets = False
     
     def init(self):
         assert isinstance(self.master, MilLine), "master is not set"
@@ -269,6 +279,7 @@ class MilNote:
         self.floorPosition = self.master.acollection.get_value(EnumAnimationKey.Speed)
         self.master.acollection.update(self.endTime, only=EnumAnimationKey.Speed)
         self.endFloorPosition = self.master.acollection.get_value(EnumAnimationKey.Speed)
+        self.texname = ("ex" if self.isAlwaysPerfect else "") + (("hold" if self.ishold else "tap") if self.ishit else "drag") + ("_double" if self.morebets else "")
     
     def update(self, t: float):
         self.acollection.update(t)
@@ -349,7 +360,7 @@ class MilAnimationCollectionGroup:
             e.floorPosition = fp
             fp += (e.endTime - e.startTime) * (e.start + e.end) / 2
         
-        self.is_effect_opt = any(map(lambda k: self.anim_groups(k), (
+        self.is_effect_opt = any(map(lambda k: self.anim_groups[k], (
             EnumAnimationKey.PositionX,
             EnumAnimationKey.PositionY,
             EnumAnimationKey.Size,
@@ -368,7 +379,7 @@ class MilAnimationCollectionGroup:
 
         for i, es in enumerate(self.anim_groups):
             if len(es) == 0 or (only is not None and i != only):
-                if i == EnumAnimationKey.Speed and (only == -1 or only == EnumAnimationKey.Speed):
+                if i == EnumAnimationKey.Speed and (only is None or only == EnumAnimationKey.Speed):
                     self.values[i] = t * self.defaults[i]
                 continue
             
@@ -378,10 +389,10 @@ class MilAnimationCollectionGroup:
             e = es[self.indexs[i]]
             self.values[i] = e.interplate(t)
 
-            # if i == EnumAnimationKey.Speed:
-            #     if t < e.startTime: self.values[i] = t * e.start
-            #     elif e.startTime < t <  e.endTime: self.values[i] = e.floorPosition + (t - e.startTime) * (self.values[i] + e.start) / 2
-            #     else: self.values[i] = e.floorPosition + (e.endTime - e.startTime) * (e.start + e.end) / 2 + (t - e.endTime) * e.end
+            if i == EnumAnimationKey.Speed:
+                if t < e.startTime: self.values[i] = t * e.start
+                elif e.startTime < t <  e.endTime: self.values[i] = e.floorPosition + (t - e.startTime) * (self.values[i] + e.start) / 2
+                else: self.values[i] = e.floorPosition + (e.endTime - e.startTime) * (e.start + e.end) / 2 + (t - e.endTime) * e.end
     
     def get_value(self, key: int):
         return self.values[key]
@@ -471,6 +482,13 @@ class MilAnimationCollectionGroup:
             ]
         }[bearer_type])
 
+T = typing.TypeVar("")
+class Node(typing.Generic[T]):
+    __slots__ = ("value", "prev", "next")
+    def __init__(self, value: T):
+        self.value = value
+        self.prev: typing.Optional[Node[T]] = None
+        self.next: typing.Optional[Node[T]] = None
 
 T = typing.TypeVar("")
 class IterRemovableList(typing.Generic[T]):
@@ -540,7 +558,7 @@ class MilLine:
 
         self.notes.sort(key=lambda e: e.time)
         self.acollection = MilAnimationCollectionGroup.from_filter_anims(self.animations, EnumAnimationBearerType.Line)
-        self.note_groups = [IterRemovableList(can_break=False), IterRemovableList(can_break=True)]
+        self.note_groups = [IterRemovableList([], can_break=False), IterRemovableList([], can_break=True)]
 
         for note in self.notes:
             if note.acollection.is_effect_opt:
@@ -578,7 +596,26 @@ class MilChart:
         self.init()
     
     def init(self):
+        morebets_map = {}
+
         for l in self.lines:
+            for note in l.notes:
+                if note.isFake:
+                    continue
+
+                if note.time not in morebets_map:
+                    morebets_map[note.time] = 0
+
+                morebets_map[note.time] += 1
+
+        for l in self.lines:
+            for note in l.notes:
+                if note.isFake:
+                    continue
+
+                if morebets_map[note.time] > 1:
+                    note.morebets = True
+
             l.init()
     
     def update(self, t: float):
@@ -710,13 +747,28 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
             ctx.draw_line(*lineBodyP1, *lineBodyP2, lineHeadPxBorder * 0.75, 1, 1, 1, 0.8)
             ctx.restore_state()
         
+        if not line.notes:
+            continue
+        
         ctx.save_state()
         ctx.translate(*lineCen)
-        ctx.rotate(lineRot)
+        ctx.rotate_degree(lineRot - 90)
         for ngroup in line.note_groups:
-            for rm, note in ngroup:
+            for note, rm in ngroup:
                 noteClicked = note.time <= t
-                noteCurrFp = note.floorPosition - lineFp
+
+                if note.ishold and note.endTime + HOLD_DISAPPEAR_TIME < t:
+                    rm()
+                    continue
+
+                if not note.ishold and noteClicked:
+                    rm()
+                    continue
+
+                noteFsp = lineFsp * note.acollection.get_value(EnumAnimationKey.FlowSpeed) * lineSize
+                noteFpMult = SPEED_UNIT / MIL_SCRH * h * FLOW_SPEED * noteFsp
+                rawNoteFp = note.floorPosition - lineFp
+                noteCurrFp = rawNoteFp * noteFpMult
                 noteRelPos = milpos2scrpos_cen(note.acollection.get_value(EnumAnimationKey.RelativeX), note.acollection.get_value(EnumAnimationKey.RelativeY))
                 notePos = (0, -noteCurrFp)
 
@@ -730,7 +782,33 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
                     notePos = (notePos[0], note.acollection.get_value(EnumAnimationKey.PositionY) / MIL_SCRH * h)
                 
                 notePos = (notePos[0] + noteRelPos[0], notePos[1] + noteRelPos[1])
+                noteWidth = (w + h) * NOTE_SIZE * NOTE_SCALE * lineSize * note.acollection.get_value(EnumAnimationKey.Size)
+                noteTex = game_res[note.texname]
 
+                if not note.ishold:
+                    noteHeight = noteWidth / noteTex.width * noteTex.height
+                    
+                if noteCurrFp > lineVisa / MIL_SCRH * h:
+                    continue
+                
+                noteTransp = note.acollection.get_value(EnumAnimationKey.Transparency)
+                noteRot = -90-note.acollection.get_value(EnumAnimationKey.Rotation)
+
+                if note.ishold:
+                    noteTransp *= 1.0 - fixorp((t - note.endTime) / HOLD_DISAPPEAR_TIME)
+                
+                if noteTransp > 0.0:
+                    ctx.save_state()
+                    ctx.apply_color_transform(*note.acollection.get_value(EnumAnimationKey.Color))
+                    ctx.apply_color_transform(1, 1, 1, noteTransp)
+
+                    if not note.ishold:
+                        ctx.translate(*notePos)
+                        ctx.rotate_degree(noteRot)
+                        ctx.draw_texture(noteTex,  -noteWidth / 2,  -noteHeight / 2, noteWidth, noteHeight)
+                    
+                    ctx.restore_state()
+        
         ctx.restore_state()
 
     cap.put_renderer_context_frame(ctx)

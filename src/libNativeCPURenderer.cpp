@@ -658,7 +658,7 @@ void FillColor(
 }
 
 inline void GetBoarder(
-    f64 inv[6],
+    f64 mat[6],
     f64 x, f64 y, f64 width, f64 height,
     i64 *out_left, i64 *out_right, i64 *out_top, i64 *out_bottom,
     f64 max_width, f64 max_height
@@ -668,20 +668,20 @@ inline void GetBoarder(
     f64 lb_x, lb_y;
     f64 rb_x, rb_y;
 
-    TransformPointFromMatrix(inv, x, y, &lt_x, &lt_y);
-    TransformPointFromMatrix(inv, x + width, y, &rt_x, &rt_y);
-    TransformPointFromMatrix(inv, x, y + height, &lb_x, &lb_y);
-    TransformPointFromMatrix(inv, x + width, y + height, &rb_x, &rb_y);
+    TransformPointFromMatrix(mat, x, y, &lt_x, &lt_y);
+    TransformPointFromMatrix(mat, x + width, y, &rt_x, &rt_y);
+    TransformPointFromMatrix(mat, x, y + height, &lb_x, &lb_y);
+    TransformPointFromMatrix(mat, x + width, y + height, &rb_x, &rb_y);
 
     *out_left = (i64)std::min(std::min(lt_x, rt_x), std::min(lb_x, rb_x));
     *out_right = (i64)std::max(std::max(lt_x, rt_x), std::max(lb_x, rb_x));
     *out_top = (i64)std::min(std::min(lt_y, rt_y), std::min(lb_y, rb_y));
     *out_bottom = (i64)std::max(std::max(lt_y, rt_y), std::max(lb_y, rb_y));
 
-    *out_left = std::max(*out_left, 0L);
-    *out_right = std::min(*out_right, (i64)max_width);
-    *out_top = std::max(*out_top, 0L);
-    *out_bottom = std::min(*out_bottom, (i64)max_height);
+    *out_left = std::max(0L, std::min((i64)max_width, *out_left));
+    *out_right = std::max(0L, std::min((i64)max_width, *out_right));
+    *out_top = std::max(0L, std::min((i64)max_height, *out_top));
+    *out_bottom = std::max(0L, std::min((i64)max_height, *out_bottom));
 }
 
 void DrawTexture(
@@ -698,7 +698,7 @@ void DrawTexture(
     f64 scaleY = tex->height / height;
 
     i64 left, right, top, bottom;
-    GetBoarder(inv, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
+    GetBoarder(ctx->transformMatrix, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
 
     for (i64 i = left; i < right; ++i) {
         for (i64 j = top; j < bottom; ++j) {
@@ -757,7 +757,7 @@ void DrawRect(
     GetInverseTransform(ctx, inv);
 
     i64 left, right, top, bottom;
-    GetBoarder(inv, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
+    GetBoarder(ctx->transformMatrix, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
 
     for (i64 i = left; i < right; ++i) {
         for (i64 j = top; j < bottom; ++j) {
@@ -830,7 +830,7 @@ void DrawCircle(
     GetInverseTransform(ctx, inv);
 
     i64 left, right, top, bottom;
-    GetBoarder(inv, x - radius, y - radius, 2 * radius, 2 * radius, &left, &right, &top, &bottom, ctx->width, ctx->height);
+    GetBoarder(ctx->transformMatrix, x - radius, y - radius, 2 * radius, 2 * radius, &left, &right, &top, &bottom, ctx->width, ctx->height);
     
     for (i64 i = left; i < right; ++i) {
         for (i64 j = top; j < bottom; ++j) {
@@ -1195,7 +1195,7 @@ void DrawVerticalGrd(
     GetInverseTransform(ctx, inv);
 
     i64 left, right, top, bottom;
-    GetBoarder(inv, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
+    GetBoarder(ctx->transformMatrix, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
 
     for (i64 i = left; i < right; ++i) {
         for (i64 j = top; j < bottom; ++j) {
