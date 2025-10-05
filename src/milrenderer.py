@@ -692,6 +692,9 @@ game_res = {
     "meta": json.load(open(getResPath("meta.json"), "r", encoding="utf-8"))
 }
 
+logging.info("preparing hit effect textures")
+hit_effect_texs = CPURenderer.Helpers.create_milthm_hit_effect_textures(fps)
+
 logging.info("rendering")
 
 for frame_i in tqdm.trange(300, desc="Rendering"):

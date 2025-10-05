@@ -4,6 +4,7 @@ import ctypes
 import struct
 import math
 import typing
+import random
 
 lib = ctypes.CDLL("./libNativeCPURenderer.so")
 
@@ -29,6 +30,23 @@ class Helpers:
         ptr = Helpers.get_wappered_bytes_data_ptr(bytes)
         size = Helpers.get_wappered_bytes_data_size(bytes)
         return ctypes.string_at(ptr, size)
+    
+    @staticmethod
+    def create_milthm_hit_effect_textures(n: int):
+        CreateMilthmHitEffectTexture = lib.CreateMilthmHitEffectTexture
+        CreateMilthmHitEffectTexture.argtypes = (ctypes.c_double, ctypes.c_double, ctypes.c_long, ctypes.c_long, ctypes.c_double, ctypes.c_double, ctypes.c_double)
+        CreateMilthmHitEffectTexture.restype = ctypes.c_void_p
+
+        seed = random.random()
+
+        texs = []
+        for i in range(n):
+            p = i / (n - 1)
+            texs.append(PtrCreatedTexture(CreateMilthmHitEffectTexture(
+                seed, t, 512, 512, 0x96 / 0xff, 0x90 / 0xff, 0xfd / 0xff
+            )))
+        
+        return texs
 
 class RenderContext:
     def __init__(self, width: int, height: int, enable_alpha: bool):
