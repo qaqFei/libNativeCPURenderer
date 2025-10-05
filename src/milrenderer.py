@@ -689,11 +689,12 @@ game_res = {
     "drag": CPURenderer.Texture.from_pilimg(Image.open(getResPath("drag.png"))),
     "drag_double": CPURenderer.Texture.from_pilimg(Image.open(getResPath("drag_double.png"))),
     "line_head": CPURenderer.Texture.from_pilimg(Image.open(getResPath("line_head.png"))),
+    "meta": json.load(open(getResPath("meta.json"), "r", encoding="utf-8"))
 }
 
 logging.info("rendering")
 
-for frame_i in tqdm.trange(300, desc="Rendering"):
+for frame_i in tqdm.trange(num_frames, desc="Rendering"):
     ctx.set_color(0, 0, 0, 0)
     t = frame_i / cap.frame_rate
     chart.update(t)
@@ -785,9 +786,6 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
                 noteWidth = (w + h) * NOTE_SIZE * NOTE_SCALE * lineSize * note.acollection.get_value(EnumAnimationKey.Size)
                 noteTex = game_res[note.texname]
 
-                if not note.ishold:
-                    noteHeight = noteWidth / noteTex.width * noteTex.height
-                    
                 if noteCurrFp > lineVisa / MIL_SCRH * h:
                     continue
                 
@@ -801,11 +799,19 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
                     ctx.save_state()
                     ctx.apply_color_transform(*note.acollection.get_value(EnumAnimationKey.Color))
                     ctx.apply_color_transform(1, 1, 1, noteTransp)
+                    ctx.translate(*notePos)
+                    ctx.rotate_degree(noteRot)
 
                     if not note.ishold:
-                        ctx.translate(*notePos)
-                        ctx.rotate_degree(noteRot)
-                        ctx.draw_texture(noteTex,  -noteWidth / 2,  -noteHeight / 2, noteWidth, noteHeight)
+                        noteHeight = noteWidth / noteTex.width * noteTex.height
+                        ctx.draw_texture(noteTex, -noteWidth / 2,  -noteHeight / 2, noteWidth, noteHeight)
+                    else:
+                        altas = game_res["meta"]["holdAtlas" if not note.morebets else "holdDoubleAtlas"]
+                        holdHeadHeight = holdTailHeight = noteWidth / 2
+                        holdLength = (note.endFloorPosition - (lineFp if noteClicked else note.floorPosition)) * noteFpMult
+                        ctx.draw_splitted_texture(noteTex, -holdHeadHeight, -noteWidth / 2, holdHeadHeight, noteWidth, 0, altas[0] / noteTex.width, 0.0, 1.0)
+                        ctx.draw_splitted_texture(noteTex, 0, -noteWidth / 2, holdLength, noteWidth, altas[0] / noteTex.width, 1.0 - altas[1] / noteTex.width, 0.0, 1.0)
+                        ctx.draw_splitted_texture(noteTex, holdLength, -noteWidth / 2, holdTailHeight, noteWidth, 1.0 - altas[1] / noteTex.width, 1.0, 0.0, 1.0)
                     
                     ctx.restore_state()
         

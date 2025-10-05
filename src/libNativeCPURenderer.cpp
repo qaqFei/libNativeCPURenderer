@@ -720,6 +720,47 @@ void DrawTexture(
     }
 }
 
+void DrawSplittedTexture(
+    RenderContext* ctx,
+    Texture* tex,
+    f64 x, f64 y,
+    f64 width, f64 height,
+    f64 uStart, f64 uEnd,
+    f64 vStart, f64 vEnd
+) {
+    if (width == 0 || height == 0) return;
+
+    f64 inv[6];
+    GetInverseTransform(ctx, inv);
+    f64 scaleX = tex->width / width;
+    f64 scaleY = tex->height / height;
+
+    i64 left, right, top, bottom;
+    GetBoarder(ctx->transformMatrix, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
+
+    for (i64 i = left; i < right; ++i) {
+        for (i64 j = top; j < bottom; ++j) {
+            f64 invX, invY;
+            TransformPointFromMatrix(inv, i, j, &invX, &invY);
+
+            if (invX < x) continue;
+            if (invX > x + width) continue;
+            if (invY < y) continue;
+            if (invY > y + height) continue;
+
+            f64 u = (invX - x) * scaleX;
+            f64 v = (invY - y) * scaleY;
+
+            u = (uStart + (uEnd - uStart) * u / tex->width) * tex->width;
+            v = (vStart + (vEnd - vStart) * v / tex->height) * tex->height;
+
+            f64 r, g, b, a;
+            InterpolateColorFromBuffer(tex->buffer, tex->width, tex->height, tex->enableAlpha, u, v, &r, &g, &b, &a);
+            ApplyPixel(ctx, i, j, r, g, b, a);
+        }
+    }
+}
+
 inline bool pointInPolygon(
     f64 x, f64 y,
     f64 points[][2], i64 num_points

@@ -88,6 +88,13 @@ class RenderContext:
         DrawTexture.restype = None
 
         DrawTexture(self._ptr, tex._ptr, x, y, w, h)
+    
+    def draw_splitted_texture(self, tex: Texture, x: float, y: float, width: float, height: flaot, u_start: float, u_end: float, v_start: float, v_end: float):
+        DrawSplittedTexture = lib.DrawSplittedTexture
+        DrawSplittedTexture.argtypes = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double)
+        DrawSplittedTexture.restype = None
+
+        DrawSplittedTexture(self._ptr, tex._ptr, x, y, width, height, u_start, u_end, v_start, v_end)
 
     def apply_transform(self, a: float, b: float, c: float, d: float, e: float, f: float):
         ApplyTransform = lib.ApplyTransform
