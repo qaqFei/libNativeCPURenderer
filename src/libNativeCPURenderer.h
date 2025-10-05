@@ -143,4 +143,6 @@ extern "C" {
     void DrawSplittedTexture(RenderContext* ctx, Texture* tex, f64 x, f64 y, f64 width, f64 height, f64 uStart, f64 uEnd, f64 vStart, f64 vEnd);
     Texture* CreateTextureFromRenderContextShared(RenderContext* ctx);
     void ResizeRenderContext(RenderContext* ctx, i64 width, i64 height);
+    void GetMilthmHitEffectPixel(f64 seed, f64 t, f64 x, f64 y, f64* a);
+    Texture* CreateMilthmHitEffectTexture(f64 seed, f64 t, i64 width, i64 height, f64 r, f64 g, f64 b);
 }

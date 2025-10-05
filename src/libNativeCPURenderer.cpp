@@ -1274,3 +1274,120 @@ void DrawVerticalGrd(
         }
     }
 }
+
+namespace ShaderUtils {
+    struct vec2 {
+        f64 x, y;
+    };
+
+    vec2 dot_vec2(vec2 v1, vec2 v2) {
+        return { v1.x * v2.x - v1.y * v2.y, v1.x * v2.y + v1.y * v2.x };
+    }
+
+    vec2 sin_vec2(vec2 v) {
+        return { sin(v.x), sin(v.y) };
+    }
+
+    f64 fract(f64 x) {
+        return x - floor(x);
+    }
+
+    vec2 fract_vec2(vec2 v) {
+        return { fract(v.x), fract(v.y) };
+    }
+
+    f64 rand(vec2 n) {
+        vec2 dotted = dot_vec2(n, {12.9898, 78.233});
+        return fract(sin(dotted.x + dotted.y) * 43758.5453);
+    }
+
+    vec2 floor_vec2(vec2 v) {
+        return { floor(v.x), floor(v.y) };
+    }
+
+    vec2 operator+(vec2 a, vec2 b) { return { a.x + b.x, a.y + b.y }; }
+    vec2 operator*(vec2 a, f64 b) { return { a.x * b, a.y * b }; }
+    vec2 operator*(vec2 a, vec2 b) { return { a.x * b.x, a.y * b.y }; }
+    vec2 operator-(vec2 a, f64 b) { return { a.x - b, a.y - b }; }
+    vec2 operator-(f64 b, vec2 a) { return { b - a.x, b - a.y }; }
+    vec2 operator-(vec2 a, vec2 b) { return { a.x - b.x, a.y - b.y }; }
+
+    f64 mix(f64 a, f64 b, f64 t) {
+        return a + (b - a) * t;
+    }
+
+    f64 clamp(f64 x, f64 minVal, f64 maxVal) {
+        return x < minVal ? minVal : (x > maxVal ? maxVal : x);
+    }
+
+    f64 length_vec2(vec2 v) {
+        return sqrt(v.x * v.x + v.y * v.y);
+    }
+
+    f64 atan2_vec2(vec2 v) {
+        return atan2(v.y, v.x);
+    }
+
+    f64 noise(vec2 p) {
+        vec2 ip = floor_vec2(p);
+        vec2 fp = fract_vec2(p);
+
+        f64 a = rand(ip);
+        f64 b = rand(ip + vec2{1.0, 0.0});
+        f64 c = rand(ip + vec2{0.0, 1.0});
+        f64 d = rand(ip + vec2{1.0, 1.0});
+
+        vec2 u = fp * fp * (vec2{3.0, 3.0} - fp * 2.0);
+        return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    }
+
+    f64 smoothstep(f64 edge0, f64 edge1, f64 x) {
+        f64 t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+        return t * t * (3.0 - 2.0 * t);
+    }
+
+    f64 circularNoise(vec2 uv, f64 density, f64 seed) {
+        vec2 center = uv - vec2{0.5, 0.5};
+        f64 radius = length_vec2(center) * density;
+        f64 angle = atan2_vec2(center);
+
+        vec2 seedOffset = {seed * 100.0, seed * 100.0};
+        vec2 polarCoord = center + seedOffset + vec2{radius, angle};
+
+        f64 n = 0.0;
+        n += noise(polarCoord) * 0.7;
+        n += noise(polarCoord * 2.0) * 0.3;
+        n += noise(polarCoord * 4.0) * 0.1;
+
+        return n;
+    }
+}
+
+void GetMilthmHitEffectPixel(f64 seed, f64 t, f64 x, f64 y, f64* a) {
+    using namespace ShaderUtils;
+
+    f64 n = circularNoise({x, y}, 50.0, seed);
+    n = smoothstep(t, t, n);
+    *a = n < 0.5 ? 0.0 : 1.0;
+}
+
+Texture* CreateMilthmHitEffectTexture(f64 seed, f64 t, i64 width, i64 height, f64 r, f64 g, f64 b) {
+    Texture* tex = new Texture();
+    tex->width = width;
+    tex->height = height;
+    tex->enableAlpha = true;
+    tex->buffer = new f64[width * height * 4];
+
+    for (i64 i = 0; i < width; ++i) {
+        for (i64 j = 0; j < height; ++j) {
+            f64 a;
+            GetMilthmHitEffectPixel(seed, t, i, j, &a);
+            tex->buffer[i * height * 4 + j * 4 + 0] = r;
+            tex->buffer[i * height * 4 + j * 4 + 1] = g;
+            tex->buffer[i * height * 4 + j * 4 + 2] = b;
+            tex->buffer[i * height * 4 + j * 4 + 3] = a;
+        }
+    }
+
+    return tex;
+}
