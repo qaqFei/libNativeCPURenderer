@@ -111,7 +111,7 @@ easings: list[list[typing.Callable[[float], float]]] = [
 
 logging.info("creating render context")
 # ctx = CPURenderer.RenderContext(w, h, enable_alpha=False)
-ctx = CPURenderer.Mult
+ctx = CPURenderer.MultiThreadedRenderContextPreparer(w, h, enable_alpha=False)
 cap = CPURenderer.VideoCap(w, h, fps)
 
 def error(msg: str):
@@ -874,6 +874,6 @@ for frame_i in tqdm.trange(num_frames, desc="Preparing"):
     for hite in removes_hit_effects:
         current_hit_effects.remove(hite)
 
-    cap.put_renderer_context_frame(ctx)
+    # cap.put_renderer_context_frame(ctx)
 
 cap.release()

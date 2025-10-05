@@ -328,6 +328,7 @@ class MultiThreadedRenderContextPreparer(RenderContext):
             "set_color",
             "get_color",
             "draw_vertical_grd",
+            "draw_vertical_mut_grd"
         )
 
         call_immediate_methods = (
@@ -345,11 +346,13 @@ class MultiThreadedRenderContextPreparer(RenderContext):
 
         for method_name in proxy_methods:
             def dec(name: str):
-                def wappered(self, *args, **kwargs):
+                def wappered(*args, **kwargs):
                     self.frames[-1].put((name, args, kwargs))
 
                     if name in call_immediate_methods:
-                        getattr(self, name)(*args, **kwargs)
+                        getattr(RenderContext, name)(self, *args, **kwargs)
+                
+                setattr(self, method_name, wappered)
             
             dec(method_name)
     
