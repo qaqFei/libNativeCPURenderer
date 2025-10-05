@@ -797,7 +797,7 @@ for frame_i in tqdm.trange(num_frames, desc="Rendering"):
                 
                 if noteTransp > 0.0:
                     ctx.save_state()
-                    ctx.apply_color_transform(*note.acollection.get_value(EnumAnimationKey.Color))
+                    ctx.apply_color_transform(*map(lambda x: x / 255, note.acollection.get_value(EnumAnimationKey.Color)))
                     ctx.apply_color_transform(1, 1, 1, noteTransp)
                     ctx.translate(*notePos)
                     ctx.rotate_degree(noteRot)
@@ -808,7 +808,7 @@ for frame_i in tqdm.trange(num_frames, desc="Rendering"):
                     else:
                         altas = game_res["meta"]["holdAtlas" if not note.morebets else "holdDoubleAtlas"]
                         holdHeadHeight = holdTailHeight = noteWidth / 2
-                        holdLength = (note.endFloorPosition - (lineFp if noteClicked else note.floorPosition)) * noteFpMult
+                        holdLength = max(0, (note.endFloorPosition - (lineFp if noteClicked else note.floorPosition)) * noteFpMult)
                         ctx.draw_splitted_texture(noteTex, -holdHeadHeight, -noteWidth / 2, holdHeadHeight, noteWidth, 0, altas[0] / noteTex.width, 0.0, 1.0)
                         ctx.draw_splitted_texture(noteTex, 0, -noteWidth / 2, holdLength, noteWidth, altas[0] / noteTex.width, 1.0 - altas[1] / noteTex.width, 0.0, 1.0)
                         ctx.draw_splitted_texture(noteTex, holdLength, -noteWidth / 2, holdTailHeight, noteWidth, 1.0 - altas[1] / noteTex.width, 1.0, 0.0, 1.0)
