@@ -36,6 +36,14 @@ void DestroyRenderContext(RenderContext* ctx) {
     delete ctx;
 }
 
+void ResizeRenderContext(RenderContext* ctx, i64 width, i64 height) {
+    f64* newBuffer = new f64[width * height * (ctx->enableAlpha ? 4 : 3)];
+    delete[] ctx->buffer;
+    ctx->buffer = newBuffer;
+    ctx->width = width;
+    ctx->height = height;
+}
+
 void DestroyVideoCap(VideoCap* cap) {
     return;
     delete cap;
@@ -232,7 +240,7 @@ void PutRendererContextFrame(VideoCap* cap, RenderContext* ctx) {
 
     if (!cap->swsCtx) {
         cap->swsCtx = sws_getContext(
-            ctx->width, ctx->height, AV_PIX_FMT_RGBA,
+            ctx->width, ctx->height, ipp == 4 ? AV_PIX_FMT_RGBA : AV_PIX_FMT_RGB24,
             cap->width, cap->height, AV_PIX_FMT_YUV420P,
             SWS_BILINEAR, nullptr, nullptr, nullptr
         );
@@ -242,7 +250,7 @@ void PutRendererContextFrame(VideoCap* cap, RenderContext* ctx) {
     av_image_alloc(rgbFrame->data, rgbFrame->linesize, ctx->width, ctx->height, ipp == 4 ? AV_PIX_FMT_RGBA : AV_PIX_FMT_RGB24, 1);
 
     for (int y = 0; y < ctx->height; ++y) {
-        memcpy(rgbFrame->data[0] + y * rgbFrame->linesize[0], tbuffer + y * ctx->width * 4, ctx->width * 4);
+        memcpy(rgbFrame->data[0] + y * rgbFrame->linesize[0], tbuffer + y * ctx->width * ipp, ctx->width * ipp);
     }
 
     sws_scale(cap->swsCtx, (const uint8_t* const*)rgbFrame->data, rgbFrame->linesize, 0, ctx->height, cap->frame->data, cap->frame->linesize);
@@ -363,6 +371,15 @@ Texture* CreateTextureFromRenderContext(RenderContext* ctx) {
         tex->buffer[i] = ctx->buffer[i];
     }
     
+    return tex;
+}
+
+Texture* CreateTextureFromRenderContextShared(RenderContext* ctx) {
+    Texture* tex = new Texture();
+    tex->width = ctx->width;
+    tex->height = ctx->height;
+    tex->enableAlpha = ctx->enableAlpha;
+    tex->buffer = ctx->buffer;
     return tex;
 }
 
@@ -673,10 +690,10 @@ inline void GetBoarder(
     TransformPointFromMatrix(mat, x, y + height, &lb_x, &lb_y);
     TransformPointFromMatrix(mat, x + width, y + height, &rb_x, &rb_y);
 
-    *out_left = (i64)std::min(std::min(lt_x, rt_x), std::min(lb_x, rb_x));
-    *out_right = (i64)std::max(std::max(lt_x, rt_x), std::max(lb_x, rb_x));
-    *out_top = (i64)std::min(std::min(lt_y, rt_y), std::min(lb_y, rb_y));
-    *out_bottom = (i64)std::max(std::max(lt_y, rt_y), std::max(lb_y, rb_y));
+    *out_left = (i64)std::min(std::min(lt_x, rt_x), std::min(lb_x, rb_x)) - 1;
+    *out_right = (i64)std::max(std::max(lt_x, rt_x), std::max(lb_x, rb_x)) + 1;
+    *out_top = (i64)std::min(std::min(lt_y, rt_y), std::min(lb_y, rb_y)) - 1;
+    *out_bottom = (i64)std::max(std::max(lt_y, rt_y), std::max(lb_y, rb_y)) + 1;
 
     *out_left = std::max(0L, std::min((i64)max_width, *out_left));
     *out_right = std::max(0L, std::min((i64)max_width, *out_right));

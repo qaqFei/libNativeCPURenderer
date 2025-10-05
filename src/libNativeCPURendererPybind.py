@@ -41,8 +41,12 @@ class RenderContext:
         CreateRenderContext.restype = ctypes.c_void_p
 
         self._ptr = lib.CreateRenderContext(width, height, enable_alpha)
+        self._can_release = True
     
     def __del__(self):
+        if not self._can_release:
+            return
+
         DestroyRenderContext = lib.DestroyRenderContext
         DestroyRenderContext.argtypes = (ctypes.c_void_p,)
         DestroyRenderContext.restype = None
@@ -88,6 +92,15 @@ class RenderContext:
         DrawTexture.restype = None
 
         DrawTexture(self._ptr, tex._ptr, x, y, w, h)
+    
+    def resize(self, width: int, height: int):
+        ResizeRenderContext = lib.ResizeRenderContext
+        ResizeRenderContext.argtypes = (ctypes.c_void_p, ctypes.c_long, ctypes.c_long)
+        ResizeRenderContext.restype = None
+        
+        ResizeRenderContext(self._ptr, width, height)
+        self.width = width
+        self.height = height
     
     def draw_splitted_texture(self, tex: Texture, x: float, y: float, width: float, height: flaot, u_start: float, u_end: float, v_start: float, v_end: float):
         DrawSplittedTexture = lib.DrawSplittedTexture
@@ -254,6 +267,15 @@ class RenderContext:
         CreateTextureFromRenderContext.restype = ctypes.c_void_p
 
         return PtrCreatedTexture(CreateTextureFromRenderContext(self._ptr))
+    
+    def as_texture_shared(self):
+        CreateTextureFromRenderContextShared = lib.CreateTextureFromRenderContextShared
+        CreateTextureFromRenderContextShared.argtypes = (ctypes.c_void_p,)
+        CreateTextureFromRenderContextShared.restype = ctypes.c_void_p
+
+        res = PtrCreatedTexture(CreateTextureFromRenderContextShared(self._ptr))
+        res._can_release = False
+        return res
     
     def as_pilimg(self):
         from PIL import Image

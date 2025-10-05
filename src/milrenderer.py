@@ -102,7 +102,7 @@ easings: list[list[typing.Callable[[float], float]]] = [
 ]
 
 logging.info("creating render context")
-ctx = CPURenderer.RenderContext(w, h, enable_alpha=True)
+ctx = CPURenderer.RenderContext(w, h, enable_alpha=False)
 cap = CPURenderer.VideoCap(w, h, fps)
 
 def error(msg: str):
@@ -694,7 +694,7 @@ game_res = {
 
 logging.info("rendering")
 
-for frame_i in tqdm.trange(num_frames, desc="Rendering"):
+for frame_i in tqdm.trange(300, desc="Rendering"):
     ctx.set_color(0, 0, 0, 0)
     t = frame_i / cap.frame_rate
     chart.update(t)
@@ -809,9 +809,10 @@ for frame_i in tqdm.trange(num_frames, desc="Rendering"):
                         altas = game_res["meta"]["holdAtlas" if not note.morebets else "holdDoubleAtlas"]
                         holdHeadHeight = holdTailHeight = noteWidth / 2
                         holdLength = max(0, (note.endFloorPosition - (lineFp if noteClicked else note.floorPosition)) * noteFpMult)
-                        ctx.draw_splitted_texture(noteTex, -holdHeadHeight, -noteWidth / 2, holdHeadHeight, noteWidth, 0, altas[0] / noteTex.width, 0.0, 1.0)
-                        ctx.draw_splitted_texture(noteTex, 0, -noteWidth / 2, holdLength, noteWidth, altas[0] / noteTex.width, 1.0 - altas[1] / noteTex.width, 0.0, 1.0)
-                        ctx.draw_splitted_texture(noteTex, holdLength, -noteWidth / 2, holdTailHeight, noteWidth, 1.0 - altas[1] / noteTex.width, 1.0, 0.0, 1.0)
+
+                        ctx.draw_splitted_texture(noteTex, -holdHeadHeight, -noteWidth / 2, holdHeadHeight + 1, noteWidth, 0, altas[0] / noteTex.width, 0.0, 1.0)
+                        ctx.draw_splitted_texture(noteTex, 0, -noteWidth / 2, holdLength + 1, noteWidth, altas[0] / noteTex.width, 1.0 - altas[1] / noteTex.width, 0.0, 1.0)
+                        ctx.draw_splitted_texture(noteTex, holdLength, -noteWidth / 2, holdTailHeight + 1, noteWidth, 1.0 - altas[1] / noteTex.width, 1.0, 0.0, 1.0)
                     
                     ctx.restore_state()
         

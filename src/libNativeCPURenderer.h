@@ -141,4 +141,6 @@ extern "C" {
     void ApplySpeedAudioClip(AudioClip* clip, f64 speed);
     void DrawVerticalGrd(RenderContext* ctx, f64 x, f64 y, f64 width, f64 height, f64 top_r, f64 top_g, f64 top_b, f64 top_a, f64 bottom_r, f64 bottom_g, f64 bottom_b, f64 bottom_a);
     void DrawSplittedTexture(RenderContext* ctx, Texture* tex, f64 x, f64 y, f64 width, f64 height, f64 uStart, f64 uEnd, f64 vStart, f64 vEnd);
+    Texture* CreateTextureFromRenderContextShared(RenderContext* ctx);
+    void ResizeRenderContext(RenderContext* ctx, i64 width, i64 height);
 }

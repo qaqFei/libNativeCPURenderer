@@ -1,1 +1,1 @@
-g++ -shared -fPIC -O3 -o libNativeCPURenderer.so libNativeCPURenderer.cpp -lavcodec -lavformat -lavutil -lswscale
+g++ -shared -fPIC -O3 -g -o libNativeCPURenderer.so libNativeCPURenderer.cpp -lavcodec -lavformat -lavutil -lswscale
