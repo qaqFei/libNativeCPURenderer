@@ -508,6 +508,7 @@ inline bool ApplyPixel(
     r *= ctx->colorTransform[0];
     g *= ctx->colorTransform[1];
     b *= ctx->colorTransform[2];
+    a *= ctx->colorTransform[3];
 
     i64 ipp = ctx->enableAlpha ? 4 : 3;
     i64 index = y * ctx->width * ipp + x * ipp;
@@ -522,7 +523,6 @@ inline bool ApplyPixel(
 
     if (ctx->enableAlpha) {
         ctx->buffer[index + 3] = a;
-        a *= ctx->colorTransform[3];
         a = ctx->buffer[index + 3] * (1 - a) + a * a;
     }
 
@@ -1181,4 +1181,38 @@ void ApplyCutAudioClip(AudioClip* clip, i64 startFrame, i64 endFrame) {
 
 void ApplySpeedAudioClip(AudioClip* clip, f64 speed) {
     clip->sampleRate *= speed;
+}
+
+void DrawVerticalGrd(
+    RenderContext* ctx,
+    f64 x, f64 y, f64 width, f64 height,
+    f64 top_r, f64 top_g, f64 top_b, f64 top_a,
+    f64 bottom_r, f64 bottom_g, f64 bottom_b, f64 bottom_a
+) {
+    if (width <= 0 || height <= 0) return;
+
+    f64 inv[6];
+    GetInverseTransform(ctx, inv);
+
+    i64 left, right, top, bottom;
+    GetBoarder(inv, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
+
+    for (i64 i = left; i < right; ++i) {
+        for (i64 j = top; j < bottom; ++j) {
+            f64 invX, invY;
+            TransformPointFromMatrix(inv, i, j, &invX, &invY);
+
+            if (invX < x) continue;
+            if (invX > x + width) continue;
+            if (invY < y) continue;
+            if (invY > y + height) continue;
+            
+            f64 p = (invY - y) / height;
+            f64 r = top_r + (bottom_r - top_r) * p;
+            f64 g = top_g + (bottom_g - top_g) * p;
+            f64 b = top_b + (bottom_b - top_b) * p;
+            f64 a = top_a + (bottom_a - top_a) * p;
+            ApplyPixel(ctx, i, j, r, g, b, a);
+        }
+    }
 }

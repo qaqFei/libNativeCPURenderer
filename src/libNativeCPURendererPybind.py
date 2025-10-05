@@ -224,6 +224,23 @@ class RenderContext:
         GetColor(self._ptr, x, y, ctypes.byref(out[0]), ctypes.byref(out[1]), ctypes.byref(out[2]), ctypes.byref(out[3]))
         return tuple(map(lambda x: x.value, out))
     
+    def draw_vertical_grd(self, x: float, y: float, width: float, height: float, top_r: float, top_g: float, top_b: float, top_a: float, bottom_r: float, bottom_g: float, bottom_b: float, bottom_a: float):
+        DrawVerticalGrd = lib.DrawVerticalGrd
+        DrawVerticalGrd.argtypes = (ctypes.c_void_p, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double)
+        DrawVerticalGrd.restype = None
+
+        DrawVerticalGrd(self._ptr, x, y, width, height, top_r, top_g, top_b, top_a, bottom_r, bottom_g, bottom_b, bottom_a)
+    
+    def draw_vertical_mut_grd(self, x: float, y: float, width: float, height: float, steps: list[tuple[tuple[float, float, float, float, float]]]):
+        for i, (p, s) in enumerate(steps):
+            if i == len(steps) - 1:
+                break
+
+            np, ns = steps[i + 1]
+            ty = y + height * p
+            theight = height * (np - p)
+            self.draw_vertical_grd(x, ty, width, theight, s[0], s[1], s[2], s[3], ns[0], ns[1], ns[2], ns[3])
+
     def as_texure(self):
         CreateTextureFromRenderContext = lib.CreateTextureFromRenderContext
         CreateTextureFromRenderContext.argtypes = (ctypes.c_void_p,)
