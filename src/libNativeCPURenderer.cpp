@@ -567,7 +567,7 @@ inline void InterpolateColorFromBuffer(
     *out_r = buffer[index + 0];
     *out_g = buffer[index + 1];
     *out_b = buffer[index + 2];
-    
+
     if (enableAlpha) {
         *out_a = buffer[index + 3];
     }
@@ -734,8 +734,8 @@ void DrawTexture(
         i64 iwidth = std::max(0L, std::min(ctx->width - (i64)x, (i64)x + (i64)width)) - x;
         i64 iheight = std::max(0L, std::min(ctx->height - (i64)y, (i64)y + (i64)height)) - y;
 
-        if (tex->enableAlpha == ctx->enableAlpha && iwidth == tex->width && iheight == tex->height) {
-            std::copy(tex->buffer, tex->buffer + tex->width * tex->height * (tex->enableAlpha ? 4 : 3), ctx->buffer + iy * ctx->width * (ctx->enableAlpha ? 4 : 3) + ix * (ctx->enableAlpha ? 4 : 3));
+        if (tex->enableAlpha == ctx->enableAlpha && iwidth == tex->width && iheight == tex->height && false) {
+            
         }
         else {
             for (i64 i = x; i < x + width; ++i) {
