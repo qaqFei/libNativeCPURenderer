@@ -307,8 +307,51 @@ class MultiThreadedRenderContextPreparer(RenderContext):
         self.end_of_frame()
 
         proxy_methods = (
-            
+            "fill_color",
+            "draw_texture",
+            "draw_splitted_texture",
+            "apply_transform",
+            "scale",
+            "rotate",
+            "translate",
+            "rotate_degree",
+            "save_state",
+            "restore_state",
+            "draw_line",
+            "draw_rect",
+            "apply_pixel",
+            "draw_circle",
+            "set_transform",
+            "set_color_transform",
+            "apply_color_transform",
+            "set_pixel",
+            "set_color",
+            "get_color",
+            "draw_vertical_grd",
         )
+
+        call_immediate_methods = (
+            "apply_transform",
+            "scale",
+            "rotate",
+            "translate",
+            "rotate_degree",
+            "save_state",
+            "restore_state",
+            "set_transform",
+            "set_color_transform",
+            "apply_color_transform",
+        )
+
+        for method_name in proxy_methods:
+            def dec(name: str):
+                def wappered(self, *args, **kwargs):
+                    self.frames[-1].put((name, args, kwargs))
+
+                    if name in call_immediate_methods:
+                        getattr(self, name)(*args, **kwargs)
+            
+            dec(method_name)
     
     def end_of_frame(self):
         self.frames.append(queue.Queue())
