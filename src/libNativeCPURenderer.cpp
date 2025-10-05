@@ -530,9 +530,11 @@ inline bool ApplyPixel(
     i64 ipp = ctx->enableAlpha ? 4 : 3;
     i64 index = y * ctx->width * ipp + x * ipp;
 
-    r = ctx->buffer[index + 0] * (1 - a) + r * a;
-    g = ctx->buffer[index + 1] * (1 - a) + g * a;
-    b = ctx->buffer[index + 2] * (1 - a) + b * a;
+    if (a != 1) {
+        r = ctx->buffer[index + 0] * (1 - a) + r * a;
+        g = ctx->buffer[index + 1] * (1 - a) + g * a;
+        b = ctx->buffer[index + 2] * (1 - a) + b * a;
+    }
 
     ctx->buffer[index + 0] = r;
     ctx->buffer[index + 1] = g;
@@ -544,6 +546,10 @@ inline bool ApplyPixel(
     }
 
     return true;
+}
+
+bool IsNoTransform(f64 matrix[6]) {
+    return matrix[0] - 1 + matrix[1] + matrix[2] + matrix[3] - 1 + matrix[4] + matrix[5] < 1e-5;
 }
 
 inline void InterpolateColorFromBuffer(
@@ -561,58 +567,57 @@ inline void InterpolateColorFromBuffer(
     *out_r = buffer[index + 0];
     *out_g = buffer[index + 1];
     *out_b = buffer[index + 2];
+    
     if (enableAlpha) {
         *out_a = buffer[index + 3];
     }
 
-    return;
+    // i64 ix = (i64)x;
+    // i64 iy = (i64)y;
+    // i64 nx = ix + 1;
+    // i64 ny = iy + 1;
 
-    i64 ix = (i64)x;
-    i64 iy = (i64)y;
-    i64 nx = ix + 1;
-    i64 ny = iy + 1;
+    // i64 ipp = enableAlpha ? 4 : 3;
 
-    i64 ipp = enableAlpha ? 4 : 3;
+    // i64 index0 = iy * width * ipp + ix * ipp;
+    // f64 r0 = buffer[index0 + 0];
+    // f64 g0 = buffer[index0 + 1];
+    // f64 b0 = buffer[index0 + 2];
+    // f64 a0 = enableAlpha ? buffer[index0 + 3] : 1;
 
-    i64 index0 = iy * width * ipp + ix * ipp;
-    f64 r0 = buffer[index0 + 0];
-    f64 g0 = buffer[index0 + 1];
-    f64 b0 = buffer[index0 + 2];
-    f64 a0 = enableAlpha ? buffer[index0 + 3] : 1;
+    // i64 index1 = iy * width * ipp + nx * ipp;
+    // f64 r1 = buffer[index1 + 0];
+    // f64 g1 = buffer[index1 + 1];
+    // f64 b1 = buffer[index1 + 2];
+    // f64 a1 = enableAlpha ? buffer[index1 + 3] : 1;
 
-    i64 index1 = iy * width * ipp + nx * ipp;
-    f64 r1 = buffer[index1 + 0];
-    f64 g1 = buffer[index1 + 1];
-    f64 b1 = buffer[index1 + 2];
-    f64 a1 = enableAlpha ? buffer[index1 + 3] : 1;
+    // i64 index2 = ny * width * ipp + ix * ipp;
+    // f64 r2 = buffer[index2 + 0];
+    // f64 g2 = buffer[index2 + 1];
+    // f64 b2 = buffer[index2 + 2];
+    // f64 a2 = enableAlpha ? buffer[index2 + 3] : 1;
 
-    i64 index2 = ny * width * ipp + ix * ipp;
-    f64 r2 = buffer[index2 + 0];
-    f64 g2 = buffer[index2 + 1];
-    f64 b2 = buffer[index2 + 2];
-    f64 a2 = enableAlpha ? buffer[index2 + 3] : 1;
+    // i64 index3 = ny * width * ipp + nx * ipp;
+    // f64 r3 = buffer[index3 + 0];
+    // f64 g3 = buffer[index3 + 1];
+    // f64 b3 = buffer[index3 + 2];
+    // f64 a3 = enableAlpha ? buffer[index3 + 3] : 1;
 
-    i64 index3 = ny * width * ipp + nx * ipp;
-    f64 r3 = buffer[index3 + 0];
-    f64 g3 = buffer[index3 + 1];
-    f64 b3 = buffer[index3 + 2];
-    f64 a3 = enableAlpha ? buffer[index3 + 3] : 1;
+    // f64 u = x - ix;
+    // f64 v = y - iy;
 
-    f64 u = x - ix;
-    f64 v = y - iy;
+    // f64 r = r0 * (1 - u) * (1 - v) + r1 * u * (1 - v) + r2 * (1 - u) * v + r3 * u * v;
+    // f64 g = g0 * (1 - u) * (1 - v) + g1 * u * (1 - v) + g2 * (1 - u) * v + g3 * u * v;
+    // f64 b = b0 * (1 - u) * (1 - v) + b1 * u * (1 - v) + b2 * (1 - u) * v + b3 * u * v;
 
-    f64 r = r0 * (1 - u) * (1 - v) + r1 * u * (1 - v) + r2 * (1 - u) * v + r3 * u * v;
-    f64 g = g0 * (1 - u) * (1 - v) + g1 * u * (1 - v) + g2 * (1 - u) * v + g3 * u * v;
-    f64 b = b0 * (1 - u) * (1 - v) + b1 * u * (1 - v) + b2 * (1 - u) * v + b3 * u * v;
+    // *out_r = r;
+    // *out_g = g;
+    // *out_b = b;
 
-    *out_r = r;
-    *out_g = g;
-    *out_b = b;
-
-    if (enableAlpha) {
-        f64 a = a0 * (1 - u) * (1 - v) + a1 * u * (1 - v) + a2 * (1 - u) * v + a3 * u * v;
-        *out_a = a;
-    }
+    // if (enableAlpha) {
+    //     f64 a = a0 * (1 - u) * (1 - v) + a1 * u * (1 - v) + a2 * (1 - u) * v + a3 * u * v;
+    //     *out_a = a;
+    // }
 }
 
 void SetColorTransform(
@@ -720,30 +725,55 @@ void DrawTexture(
 ) {
     if (width == 0 || height == 0) return;
 
-    f64 inv[6];
-    GetInverseTransform(ctx, inv);
     f64 scaleX = tex->width / width;
     f64 scaleY = tex->height / height;
 
-    i64 left, right, top, bottom;
-    GetBoarder(ctx->transformMatrix, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
+    if (IsNoTransform(ctx->transformMatrix)) {
+        i64 ix = std::max(0L, std::min(ctx->width - 1, (i64)x));
+        i64 iy = std::max(0L, std::min(ctx->height - 1, (i64)y));
+        i64 iwidth = std::max(0L, std::min(ctx->width - (i64)x, (i64)x + (i64)width)) - x;
+        i64 iheight = std::max(0L, std::min(ctx->height - (i64)y, (i64)y + (i64)height)) - y;
 
-    for (i64 i = left; i < right; ++i) {
-        for (i64 j = top; j < bottom; ++j) {
-            f64 invX, invY;
-            TransformPointFromMatrix(inv, i, j, &invX, &invY);
+        if (tex->enableAlpha == ctx->enableAlpha && iwidth == tex->width && iheight == tex->height) {
+            std::copy(tex->buffer, tex->buffer + tex->width * tex->height * (tex->enableAlpha ? 4 : 3), ctx->buffer + iy * ctx->width * (ctx->enableAlpha ? 4 : 3) + ix * (ctx->enableAlpha ? 4 : 3));
+        }
+        else {
+            for (i64 i = x; i < x + width; ++i) {
+                for (i64 j = y; j < y + height; ++j) {
+                    f64 u = (i - x) * scaleX;
+                    f64 v = (j - y) * scaleY;
 
-            if (invX < x) continue;
-            if (invX > x + width) continue;
-            if (invY < y) continue;
-            if (invY > y + height) continue;
+                    f64 r, g, b, a;
+                    InterpolateColorFromBuffer(tex->buffer, tex->width, tex->height, tex->enableAlpha, u, v, &r, &g, &b, &a);
+                    ApplyPixel(ctx, i, j, r, g, b, a);
+                }
+            }
+        }
+    }
+    else {
+        f64 inv[6];
+        GetInverseTransform(ctx, inv);
 
-            f64 u = (invX - x) * scaleX;
-            f64 v = (invY - y) * scaleY;
+        i64 left, right, top, bottom;
+        GetBoarder(ctx->transformMatrix, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
 
-            f64 r, g, b, a;
-            InterpolateColorFromBuffer(tex->buffer, tex->width, tex->height, tex->enableAlpha, u, v, &r, &g, &b, &a);
-            ApplyPixel(ctx, i, j, r, g, b, a);
+        for (i64 i = left; i < right; ++i) {
+            for (i64 j = top; j < bottom; ++j) {
+                f64 invX, invY;
+                TransformPointFromMatrix(inv, i, j, &invX, &invY);
+
+                if (invX < x) continue;
+                if (invX > x + width) continue;
+                if (invY < y) continue;
+                if (invY > y + height) continue;
+
+                f64 u = (invX - x) * scaleX;
+                f64 v = (invY - y) * scaleY;
+
+                f64 r, g, b, a;
+                InterpolateColorFromBuffer(tex->buffer, tex->width, tex->height, tex->enableAlpha, u, v, &r, &g, &b, &a);
+                ApplyPixel(ctx, i, j, r, g, b, a);
+            }
         }
     }
 }
@@ -1265,12 +1295,11 @@ void DrawVerticalGrd(
 
     i64 left, right, top, bottom;
     GetBoarder(ctx->transformMatrix, x, y, width, height, &left, &right, &top, &bottom, ctx->width, ctx->height);
-
+    
     for (i64 i = left; i < right; ++i) {
         for (i64 j = top; j < bottom; ++j) {
             f64 invX, invY;
             TransformPointFromMatrix(inv, i, j, &invX, &invY);
-
             if (invX < x) continue;
             if (invX > x + width) continue;
             if (invY < y) continue;
