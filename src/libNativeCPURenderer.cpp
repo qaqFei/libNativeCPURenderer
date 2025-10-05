@@ -563,7 +563,7 @@ inline void InterpolateColorFromBuffer(
     if (y >= height - 1) y = height - 2;
 
     i64 ipp = enableAlpha ? 4 : 3;
-    i64 index = y * width * ipp + x * ipp;
+    i64 index = (i64)y * width * ipp + (i64)x * ipp;
     *out_r = buffer[index + 0];
     *out_g = buffer[index + 1];
     *out_b = buffer[index + 2];
