@@ -5,6 +5,7 @@ import struct
 import math
 import typing
 import random
+import queue
 
 lib = ctypes.CDLL("./libNativeCPURenderer.so")
 
@@ -298,6 +299,19 @@ class RenderContext:
     def as_pilimg(self):
         from PIL import Image
         return Image.frombytes("RGBA", (self.width, self.height), self.get_buffer_as_uint8())
+
+class MultiThreadedRenderContextPreparer(RenderContext):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.frames = []
+        self.end_of_frame()
+
+        proxy_methods = (
+            
+        )
+    
+    def end_of_frame(self):
+        self.frames.append(queue.Queue())
 
 class Texture:
     def __init__(self, width: int, height: int, enableAlpha: bool, data: typing.ByteString, is_uint8: bool = True):

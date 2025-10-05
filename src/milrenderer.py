@@ -110,7 +110,8 @@ easings: list[list[typing.Callable[[float], float]]] = [
 ]
 
 logging.info("creating render context")
-ctx = CPURenderer.RenderContext(w, h, enable_alpha=False)
+# ctx = CPURenderer.RenderContext(w, h, enable_alpha=False)
+ctx = CPURenderer.Mult
 cap = CPURenderer.VideoCap(w, h, fps)
 
 def error(msg: str):
@@ -716,7 +717,7 @@ current_hit_effects = []
 
 logging.info("rendering")
 
-for frame_i in tqdm.trange(num_frames, desc="Rendering"):
+for frame_i in tqdm.trange(num_frames, desc="Preparing"):
     ctx.set_color(0, 0, 0, 0)
     t = frame_i / cap.frame_rate
     chart.update(t)
