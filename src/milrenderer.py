@@ -8,6 +8,7 @@ import io
 import typing
 import logging
 import math
+import random
 
 import pydub
 import tqdm
@@ -57,7 +58,14 @@ logging.debug(f"{SPEED_UNIT=}")
 
 HOLD_DISAPPEAR_TIME = 0.2
 FLOW_SPEED = args.flow_speed
+HOLD_SPWAN_HIT_EFFECT_SEP = 0.1
+HIT_EFFECT_DUR = 0.5
+HITEFFECT_SIZE = 0.12
+HITEFFECT_PREPARE_GROUP_NUM = 16
 logging.debug(f"{HOLD_DISAPPEAR_TIME=}, {FLOW_SPEED=}")
+logging.debug(f"{HOLD_SPWAN_HIT_EFFECT_SEP=}, {HIT_EFFECT_DUR=}")
+logging.debug(f"{HITEFFECT_SIZE=}")
+logging.debug(f"{HITEFFECT_PREPARE_GROUP_NUM=}")
 
 easings: list[list[typing.Callable[[float], float]]] = [
     [
@@ -271,6 +279,9 @@ class MilNote:
         self.floorPosition = 0.0
         self.endFloorPosition = 0.0
         self.morebets = False
+        self.clicked = False
+        self.holdLastSpwanHitEffectTime = self.time
+        self.transform = (0.0, ) * 6
     
     def init(self):
         assert isinstance(self.master, MilLine), "master is not set"
@@ -622,6 +633,12 @@ class MilChart:
         for l in self.lines:
             l.update(t)
 
+class MilHitEffect:
+    def __init__(self, note: MilNote, t: float):
+        self.note = note
+        self.t = t
+        self.group = random.randint(0, HITEFFECT_PREPARE_GROUP_NUM - 1)
+
 if not hasFile("/meta.json"):
     error(f"{args.input} is not a valid chart file, /meta.json not found")
 
@@ -689,15 +706,17 @@ game_res = {
     "drag": CPURenderer.Texture.from_pilimg(Image.open(getResPath("drag.png"))),
     "drag_double": CPURenderer.Texture.from_pilimg(Image.open(getResPath("drag_double.png"))),
     "line_head": CPURenderer.Texture.from_pilimg(Image.open(getResPath("line_head.png"))),
-    "meta": json.load(open(getResPath("meta.json"), "r", encoding="utf-8"))
+    "meta": json.load(open(getResPath("meta.json"), "r", encoding="utf-8")),
+    "perfect_circ": CPURenderer.Texture.from_pilimg(Image.open(getResPath("perfect_circ.png"))).resample(512, 512)
 }
 
 logging.info("preparing hit effect textures")
-hit_effect_texs = CPURenderer.Helpers.create_milthm_hit_effect_textures(fps)
+hit_effect_texs = [CPURenderer.Helpers.create_milthm_hit_effect_textures(game_res["perfect_circ"], int(fps * HIT_EFFECT_DUR)) for _ in range(HITEFFECT_PREPARE_GROUP_NUM)]
+current_hit_effects = []
 
 logging.info("rendering")
 
-for frame_i in tqdm.trange(300, desc="Rendering"):
+for frame_i in tqdm.trange(num_frames, desc="Rendering"):
     ctx.set_color(0, 0, 0, 0)
     t = frame_i / cap.frame_rate
     chart.update(t)
@@ -757,9 +776,18 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
         ctx.save_state()
         ctx.translate(*lineCen)
         ctx.rotate_degree(lineRot - 90)
+        ctx.scale(lineSize, lineSize)
         for ngroup in line.note_groups:
             for note, rm in ngroup:
                 noteClicked = note.time <= t
+
+                if noteClicked and not note.clicked:
+                    note.clicked = True
+                    current_hit_effects.append(MilHitEffect(note, note.time))
+                
+                # while note.ishold and note.holdLastSpwanHitEffectTime + HOLD_SPWAN_HIT_EFFECT_SEP <= t:
+                #     note.holdLastSpwanHitEffectTime += HOLD_SPWAN_HIT_EFFECT_SEP
+                #     current_hit_effects.append(MilHitEffect(note, note.holdLastSpwanHitEffectTime))
 
                 if note.ishold and note.endTime + HOLD_DISAPPEAR_TIME < t:
                     rm()
@@ -769,7 +797,7 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
                     rm()
                     continue
 
-                noteFsp = lineFsp * note.acollection.get_value(EnumAnimationKey.FlowSpeed) * lineSize
+                noteFsp = lineFsp * note.acollection.get_value(EnumAnimationKey.FlowSpeed)
                 noteFpMult = SPEED_UNIT / MIL_SCRH * h * FLOW_SPEED * noteFsp
                 rawNoteFp = note.floorPosition - lineFp
                 noteCurrFp = rawNoteFp * noteFpMult
@@ -786,7 +814,8 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
                     notePos = (notePos[0], note.acollection.get_value(EnumAnimationKey.PositionY) / MIL_SCRH * h)
                 
                 notePos = (notePos[0] + noteRelPos[0], notePos[1] + noteRelPos[1])
-                noteWidth = (w + h) * NOTE_SIZE * NOTE_SCALE * lineSize * note.acollection.get_value(EnumAnimationKey.Size)
+                noteSize = note.acollection.get_value(EnumAnimationKey.Size) * NOTE_SCALE
+                noteWidth = (w + h) * NOTE_SIZE
                 noteTex = game_res[note.texname]
 
                 if noteCurrFp > lineVisa / MIL_SCRH * h:
@@ -804,6 +833,7 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
                     ctx.apply_color_transform(1, 1, 1, noteTransp)
                     ctx.translate(*notePos)
                     ctx.rotate_degree(noteRot)
+                    ctx.scale(noteSize, noteSize)
 
                     if not note.ishold:
                         noteHeight = noteWidth / noteTex.width * noteTex.height
@@ -817,9 +847,31 @@ for frame_i in tqdm.trange(300, desc="Rendering"):
                         ctx.draw_splitted_texture(noteTex, 0, -noteWidth / 2, holdLength + 1, noteWidth, altas[0] / noteTex.width, 1.0 - altas[1] / noteTex.width, 0.0, 1.0)
                         ctx.draw_splitted_texture(noteTex, holdLength, -noteWidth / 2, holdTailHeight + 1, noteWidth, 1.0 - altas[1] / noteTex.width, 1.0, 0.0, 1.0)
                     
+                    note.transform = ctx.get_transform()
                     ctx.restore_state()
         
         ctx.restore_state()
+
+    current_hit_effects.sort(key = lambda x: x.t)
+    removes_hit_effects = []
+    for hite in current_hit_effects:
+        if hite.t + HIT_EFFECT_DUR < t:
+            removes_hit_effects.append(hite)
+            continue
+
+        ctx.save_state()
+        ctx.set_transform(*hite.note.transform)
+
+        p = 1.0 - (hite.t + HIT_EFFECT_DUR - t) / HIT_EFFECT_DUR
+        size = (w + h) * HITEFFECT_SIZE * (1.0 - (1.0 - p) ** 3)
+        texgroup = hit_effect_texs[hite.group]
+        tex = texgroup[int(p * (len(texgroup) - 1))]
+
+        ctx.draw_texture(tex, -size / 2, -size / 2, size, size)
+        ctx.restore_state()
+    
+    for hite in removes_hit_effects:
+        current_hit_effects.remove(hite)
 
     cap.put_renderer_context_frame(ctx)
 

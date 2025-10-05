@@ -7,6 +7,10 @@
 #define f32 float
 #define iu8 unsigned char
 #define LIB_NATIVE_CPU_RENDERER_VERSION 1
+#define TEXTURE_CHANNEL_R 0
+#define TEXTURE_CHANNEL_G 1
+#define TEXTURE_CHANNEL_B 2
+#define TEXTURE_CHANNEL_A 3
 
 #include <cmath>
 #include <stack>
@@ -144,5 +148,5 @@ extern "C" {
     Texture* CreateTextureFromRenderContextShared(RenderContext* ctx);
     void ResizeRenderContext(RenderContext* ctx, i64 width, i64 height);
     void GetMilthmHitEffectPixel(f64 seed, f64 t, f64 x, f64 y, f64* a);
-    Texture* CreateMilthmHitEffectTexture(f64 seed, f64 t, i64 width, i64 height, f64 r, f64 g, f64 b);
+    Texture* CreateMilthmHitEffectTexture(Texture* mask, f64 seed, f64 t, f64 r, f64 g, f64 b);
 }

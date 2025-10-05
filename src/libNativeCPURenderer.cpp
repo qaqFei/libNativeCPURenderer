@@ -690,10 +690,10 @@ inline void GetBoarder(
     TransformPointFromMatrix(mat, x, y + height, &lb_x, &lb_y);
     TransformPointFromMatrix(mat, x + width, y + height, &rb_x, &rb_y);
 
-    *out_left = (i64)std::min(std::min(lt_x, rt_x), std::min(lb_x, rb_x)) - 1;
-    *out_right = (i64)std::max(std::max(lt_x, rt_x), std::max(lb_x, rb_x)) + 1;
-    *out_top = (i64)std::min(std::min(lt_y, rt_y), std::min(lb_y, rb_y)) - 1;
-    *out_bottom = (i64)std::max(std::max(lt_y, rt_y), std::max(lb_y, rb_y)) + 1;
+    *out_left = (i64)std::min(std::min(lt_x, rt_x), std::min(lb_x, rb_x));
+    *out_right = (i64)std::max(std::max(lt_x, rt_x), std::max(lb_x, rb_x));
+    *out_top = (i64)std::min(std::min(lt_y, rt_y), std::min(lb_y, rb_y));
+    *out_bottom = (i64)std::max(std::max(lt_y, rt_y), std::max(lb_y, rb_y));
 
     *out_left = std::max(0L, std::min((i64)max_width, *out_left));
     *out_right = std::max(0L, std::min((i64)max_width, *out_right));
@@ -1279,9 +1279,9 @@ namespace ShaderUtils {
     struct vec2 {
         f64 x, y;
     };
-
-    inline vec2 dot_vec2(vec2 v1, vec2 v2) {
-        return { v1.x * v2.x - v1.y * v2.y, v1.x * v2.y + v1.y * v2.x };
+    
+    inline f64 dot(vec2 a, vec2 b) {
+        return a.x * b.x + a.y * b.y;
     }
 
     inline vec2 sin_vec2(vec2 v) {
@@ -1297,8 +1297,7 @@ namespace ShaderUtils {
     }
 
     inline f64 rand(vec2 n) {
-        vec2 dotted = dot_vec2(n, {12.9898, 78.233});
-        return fract(sin(dotted.x + dotted.y) * 43758.5453);
+        return fract(sin(dot(n, {12.9898, 78.233})) * 43758.5453);
     }
 
     inline vec2 floor_vec2(vec2 v) {
@@ -1306,10 +1305,12 @@ namespace ShaderUtils {
     }
 
     inline vec2 operator+(vec2 a, vec2 b) { return { a.x + b.x, a.y + b.y }; }
+    inline vec2 operator+(vec2 a, f64 b) { return { a.x + b, a.y + b }; }
     inline vec2 operator*(vec2 a, f64 b) { return { a.x * b, a.y * b }; }
+    inline vec2 operator*(f64 a, vec2 b) { return { a * b.x, a * b.y }; }
     inline vec2 operator*(vec2 a, vec2 b) { return { a.x * b.x, a.y * b.y }; }
     inline vec2 operator-(vec2 a, f64 b) { return { a.x - b, a.y - b }; }
-    inline vec2 operator-(f64 b, vec2 a) { return { b - a.x, b - a.y }; }
+    inline vec2 operator-(f64 a, vec2 b) { return { a - b.x, a - b.y }; }
     inline vec2 operator-(vec2 a, vec2 b) { return { a.x - b.x, a.y - b.y }; }
 
     inline f64 mix(f64 a, f64 b, f64 t) {
@@ -1320,7 +1321,7 @@ namespace ShaderUtils {
         return x < minVal ? minVal : (x > maxVal ? maxVal : x);
     }
 
-    inline f64 length_vec2(vec2 v) {
+    inline f64 length(vec2 v) {
         return sqrt(v.x * v.x + v.y * v.y);
     }
 
@@ -1330,29 +1331,28 @@ namespace ShaderUtils {
 
     inline f64 noise(vec2 p) {
         vec2 ip = floor_vec2(p);
-        vec2 fp = fract_vec2(p);
-
+        vec2 u = fract_vec2(p);
+        
         f64 a = rand(ip);
         f64 b = rand(ip + vec2{1.0, 0.0});
         f64 c = rand(ip + vec2{0.0, 1.0});
         f64 d = rand(ip + vec2{1.0, 1.0});
-
-        vec2 u = fp * fp * (vec2{3.0, 3.0} - fp * 2.0);
-        return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-    }
-
-    inline f64 smoothstep(f64 edge0, f64 edge1, f64 x) {
-        f64 t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
-        return t * t * (3.0 - 2.0 * t);
+        
+        vec2 smooth = u * u * (vec2{3.0, 3.0} - 2.0 * u);
+        return mix(mix(a, b, smooth.x), mix(c, d, smooth.x), smooth.y);
     }
 
     inline f64 circularNoise(vec2 uv, f64 density, f64 seed) {
         vec2 center = uv - vec2{0.5, 0.5};
-        f64 radius = length_vec2(center) * density;
-        f64 angle = atan2_vec2(center);
+        f64 radius = length(center) * density;
+        f64 angle = abs(atan2_vec2(center));
+        
+        if (uv.y > 0.5) {
+            angle += sin(angle) * 2.0;
+        }
 
         vec2 seedOffset = {seed * 100.0, seed * 100.0};
-        vec2 polarCoord = center + seedOffset + vec2{radius, angle};
+        vec2 polarCoord = vec2{radius, angle} + seedOffset;
 
         f64 n = 0.0;
         n += noise(polarCoord) * 0.7;
@@ -1367,25 +1367,32 @@ inline void GetMilthmHitEffectPixel(f64 seed, f64 t, f64 x, f64 y, f64* a) {
     using namespace ShaderUtils;
 
     f64 n = circularNoise({x, y}, 50.0, seed);
-    n = smoothstep(t, t, n);
-    *a = n < 0.5 ? 0.0 : 1.0;
+    *a = (n < t) ? 0.0 : 1.0;
 }
 
-Texture* CreateMilthmHitEffectTexture(f64 seed, f64 t, i64 width, i64 height, f64 r, f64 g, f64 b) {
-    Texture* tex = new Texture();
-    tex->width = width;
-    tex->height = height;
-    tex->enableAlpha = true;
-    tex->buffer = new f64[width * height * 4];
+void GetPixelChannel(Texture* tex, i64 x, i64 y, i64 channel, f64* res) {
+    *res = tex->buffer[x * tex->height * 4 + y * 4 + channel];
+}
 
-    for (i64 i = 0; i < width; ++i) {
-        for (i64 j = 0; j < height; ++j) {
+Texture* CreateMilthmHitEffectTexture(Texture* mask, f64 seed, f64 t, f64 r, f64 g, f64 b) {
+    if (!mask->enableAlpha) return nullptr;
+
+    Texture* tex = new Texture();
+    tex->width = mask->width;
+    tex->height = mask->height;
+    tex->enableAlpha = true;
+    tex->buffer = new f64[mask->width * mask->height * 4];
+
+    for (i64 i = 0; i < mask->width; ++i) {
+        for (i64 j = 0; j < mask->height; ++j) {
             f64 a;
-            GetMilthmHitEffectPixel(seed, t, i, j, &a);
-            tex->buffer[i * height * 4 + j * 4 + 0] = r;
-            tex->buffer[i * height * 4 + j * 4 + 1] = g;
-            tex->buffer[i * height * 4 + j * 4 + 2] = b;
-            tex->buffer[i * height * 4 + j * 4 + 3] = a;
+            GetMilthmHitEffectPixel(seed, t, (f64)i / mask->width, (f64)j / mask->height, &a);
+            f64 mask_a;
+            GetPixelChannel(mask, i, j, TEXTURE_CHANNEL_A, &mask_a);
+            tex->buffer[i * mask->height * 4 + j * 4 + 0] = r;
+            tex->buffer[i * mask->height * 4 + j * 4 + 1] = g;
+            tex->buffer[i * mask->height * 4 + j * 4 + 2] = b;
+            tex->buffer[i * mask->height * 4 + j * 4 + 3] = a * mask_a;
         }
     }
 

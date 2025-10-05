@@ -32,9 +32,9 @@ class Helpers:
         return ctypes.string_at(ptr, size)
     
     @staticmethod
-    def create_milthm_hit_effect_textures(n: int):
+    def create_milthm_hit_effect_textures(mask: Texture, n: int):
         CreateMilthmHitEffectTexture = lib.CreateMilthmHitEffectTexture
-        CreateMilthmHitEffectTexture.argtypes = (ctypes.c_double, ctypes.c_double, ctypes.c_long, ctypes.c_long, ctypes.c_double, ctypes.c_double, ctypes.c_double)
+        CreateMilthmHitEffectTexture.argtypes = (ctypes.c_void_p, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double)
         CreateMilthmHitEffectTexture.restype = ctypes.c_void_p
 
         seed = random.random()
@@ -43,7 +43,7 @@ class Helpers:
         for i in range(n):
             p = i / (n - 1)
             texs.append(PtrCreatedTexture(CreateMilthmHitEffectTexture(
-                seed, t, 512, 512, 0x96 / 0xff, 0x90 / 0xff, 0xfd / 0xff
+                mask._ptr, seed, p, 0x96 / 0xff, 0x90 / 0xff, 0xfd / 0xff
             )))
         
         return texs
