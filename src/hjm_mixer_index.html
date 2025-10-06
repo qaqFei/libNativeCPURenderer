@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+
+<body>
+    <h1>哈基米发生器</h1>
+    <p>上传你的 midi 文件, 点击发生</p>
+
+    midi: <input type="file" id="midi-input"><br>
+    min note: <input type="number" id="min-note" value="60"><br>
+    max note: <input type="number" id="max-note" value="128"><br>
+    note offset: <input type="number" id="note-offset" value="0"><br>
+    offset: <input type="number" id="offset" value="0"><br>
+    <button id="🐱">发生</button>
+</body>
+
+<script>
+    window.$ = x => document.querySelector(x);
+    window.$$ = x => document.querySelectorAll(x);
+
+    $("#🐱").addEventListener("click", e => {
+        const files = $("#midi-input").files;
+        if (files.length === 0) {
+            alert("请选择一个 midi 文件");
+            return;
+        }
+
+        const file = files[0];
+        const reader = new FileReader();
+        $("#🐱").disabled = true;
+        $("#🐱").innerText = "哈！！！";
+        reader.onload = e => {
+            const data = e.target.result;
+            fetch(`/🐱/${$("#min-note").value}/${$("#max-note").value}/${$("#note-offset").value}/${$("#offset").value}`, {
+                method: "POST",
+                body: data
+            }).then(res => res.blob()).then(res => {
+                const url = URL.createObjectURL(res);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${file.name.replaceAll(".mid", "").replaceAll(".midi", "")}_🐱.mp3`;
+                a.click();
+                $("#🐱").disabled = false;
+                $("#🐱").innerText = "发生";
+            });
+        };
+        reader.readAsArrayBuffer(file);
+    });
+</script>

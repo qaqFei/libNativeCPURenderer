@@ -15,6 +15,9 @@ class ProgInput(typing.Protocol):
     output: str
     min_note: int
     max_note: int
+    dnote: int
+    base: typing.Optional[CPURenderer.AudioClip]
+    offset: int
 
 def main(args: ProgInput):
     with open(args.input, "rb") as f:
@@ -61,7 +64,7 @@ def main(args: ProgInput):
     CHANNELS = 2
 
     max_time = notebin.result[-1][0] + 1.0
-    bgm = CPURenderer.AudioClip.slient(FRAME_RATE, CHANNELS, int(FRAME_RATE * max_time))
+    bgm = CPURenderer.AudioClip.slient(FRAME_RATE, CHANNELS, int(FRAME_RATE * max_time)) if args.base is None else args.base
     hjms = []
 
     for name in ("ha", "ji", "mi"):
@@ -77,6 +80,8 @@ def main(args: ProgInput):
     lastsec = -1e9
 
     for sec, et, n in tqdm.tqdm(notebin.result):
+        n += args.dnote
+        sec += args.offset / 1000
         if sec != lastsec:
             curri += 1
             lastsec = sec
@@ -98,6 +103,9 @@ if __name__ == "__main__":
     aparser.add_argument("-o", "--output", help="output wav file", required=True)
     aparser.add_argument("-min", "--min-note", help="min note", type=int, default=60)
     aparser.add_argument("-max", "--max-note", help="max note", type=int, default=127)
+    aparser.add_argument("-d", "--dnote", help="dnote", type=int, default=0)
+    aparser.add_argument("-o", "--offset", help="offset", type=int, default=0)
     args = aparser.parse_args()
 
+    args.base = None
     main(args)
