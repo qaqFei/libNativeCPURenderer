@@ -36,7 +36,7 @@ def req(min: int, max: int, dnote: int, offset: int):
             "offset": int(offset)
         })())
     except Exception as e:
-        # os.remove(input_fp)
+        os.remove(input_fp)
         os.remove(output_fp)
         return flask.Response(f"{e}", status=500)
     
